@@ -219,7 +219,6 @@ TELEGRAM_MODULES = {
     'sqlalchemy': 'SQLAlchemy',
     'psutil': 'psutil',
 }
-# Core modules mapping to None
 core_modules = {'asyncio','json','datetime','os','sys','re','time','math','random','logging','threading','subprocess','zipfile','tempfile','shutil','sqlite3','atexit'}
 for mod in core_modules:
     TELEGRAM_MODULES[mod] = None
@@ -278,7 +277,6 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
             return
 
         if attempt == 1:
-            # Pre-check for missing modules
             check_proc = subprocess.Popen([sys.executable, script_path], cwd=user_folder,
                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                           text=True, encoding='utf-8', errors='ignore')
@@ -303,7 +301,6 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
                 check_proc.communicate()
                 logger.info("Pre-check timed out, proceeding to run.")
 
-        # Long run
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
         log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
         startupinfo = None
@@ -597,7 +594,6 @@ def handle_zip_file(content, zip_name, message):
         py_files = [f for f in extracted if f.endswith('.py')]
         js_files = [f for f in extracted if f.endswith('.js')]
 
-        # Install requirements if present
         if 'requirements.txt' in extracted:
             bot.reply_to(message, "🔄 Installing Python dependencies...")
             subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', os.path.join(temp_dir, 'requirements.txt')],
@@ -607,7 +603,6 @@ def handle_zip_file(content, zip_name, message):
             bot.reply_to(message, "🔄 Installing Node dependencies...")
             subprocess.run(['npm', 'install'], cwd=temp_dir, check=False, capture_output=True)
 
-        # Determine main script
         main_script = None
         file_type = None
         for p in ['main.py', 'bot.py', 'app.py']:
@@ -626,7 +621,6 @@ def handle_zip_file(content, zip_name, message):
             bot.reply_to(message, "❌ No .py or .js script found in archive.")
             return
 
-        # Move files to user folder
         for item in os.listdir(temp_dir):
             src = os.path.join(temp_dir, item)
             dst = os.path.join(user_folder, item)
@@ -1062,7 +1056,6 @@ def start_bot_callback(call):
         else:
             threading.Thread(target=run_js_script, args=(fpath, owner, get_user_folder(owner), fname, call.message)).start()
         time.sleep(1)
-        # Update buttons
         running = is_bot_running(owner, fname)
         status = '🟢 Running' if running else '🟡 Starting (check logs)'
         txt = f"⚙️ Controls for `{fname}` ({ftype}) User `{owner}`\nStatus: {status}"
@@ -1097,7 +1090,6 @@ def stop_bot_callback(call):
         logger.error(f"stop_bot_callback error: {e}")
 
 def restart_bot_callback(call):
-    # Similar to stop + start
     try:
         _, owner_str, fname = call.data.split('_', 2)
         owner = int(owner_str)
@@ -1112,7 +1104,6 @@ def restart_bot_callback(call):
             if script_key in bot_scripts: del bot_scripts[script_key]
         bot.answer_callback_query(call.id, "🔄 Restarting...")
         time.sleep(1)
-        # Now start
         files = user_files.get(owner, [])
         ftype = next((f[1] for f in files if f[0] == fname), None)
         if not ftype:
@@ -1150,7 +1141,6 @@ def delete_bot_callback(call):
             if info:
                 kill_process_tree(info)
                 if script_key in bot_scripts: del bot_scripts[script_key]
-        # Delete files
         user_folder = get_user_folder(owner)
         fpath = os.path.join(user_folder, fname)
         if os.path.exists(fpath): os.remove(fpath)
@@ -1242,7 +1232,6 @@ def subscription_management_callback(call):
 def stats_callback(call):
     bot.answer_callback_query(call.id)
     _logic_statistics(call.message)
-    # Update menu
     try:
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
                                       reply_markup=create_main_menu_inline(call.from_user.id))
@@ -1436,6 +1425,12 @@ atexit.register(cleanup)
 if __name__ == '__main__':
     keep_alive()
     logger.info("Bot started.")
+    # Delete any existing webhook to allow polling
+    try:
+        bot.delete_webhook()
+        logger.info("Webhook deleted.")
+    except Exception as e:
+        logger.warning(f"Could not delete webhook: {e}")
     while True:
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=30)
